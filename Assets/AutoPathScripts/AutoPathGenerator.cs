@@ -1,7 +1,8 @@
 using PathCreation;
+using PathCreation.Examples;
 using UnityEngine;
 
-[RequireComponent(typeof(PathCreator))]
+[RequireComponent(typeof(PathCreator), typeof(RoadMeshCreator))]
 public class AutoPathGenerator : MonoBehaviour
 {
     [SerializeField] float pathLenght;
@@ -13,6 +14,7 @@ public class AutoPathGenerator : MonoBehaviour
     public void GeneratePath()
     {
         InitializePath();
+        GetComponent<RoadMeshCreator>().textureTiling = pathLenght;
     }
 
     private void InitializePath()
@@ -38,10 +40,5 @@ public class AutoPathGenerator : MonoBehaviour
         }
 
         return generatedPoints;
-    }
-
-    private void GenerateMesh()
-    {
-
     }
 }
