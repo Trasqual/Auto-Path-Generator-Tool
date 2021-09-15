@@ -14,13 +14,18 @@ public class AutoPathGenerator : MonoBehaviour
     public void GeneratePath()
     {
         InitializePath();
-        GetComponent<RoadMeshCreator>().textureTiling = pathLenght;
+        GetComponent<RoadMeshCreator>().textureTiling = pathLenght/10f;
+        GetComponent<RoadMeshCreator>().flattenSurface = true;
+        GetComponent<RoadMeshCreator>().roadWidth = 10;
     }
 
     private void InitializePath()
     {
         BezierPath bezierPath = new BezierPath(GeneratePoints());
         GetComponent<PathCreator>().bezierPath = bezierPath;
+
+
+        GetComponent<PathCreator>().bezierPath.GlobalNormalsAngle = 90f;
     }
 
     private Vector3[] GeneratePoints()
