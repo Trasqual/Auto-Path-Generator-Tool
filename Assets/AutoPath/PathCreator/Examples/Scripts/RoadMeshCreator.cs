@@ -5,9 +5,9 @@ using UnityEngine;
 namespace PathCreation.Examples {
     public class RoadMeshCreator : PathSceneTool {
         [Header ("Road settings")]
-        public float roadWidth = .4f;
-        [Range (0, 50f)]
-        public float thickness = .15f;
+        public float roadWidth = 6f;
+        [Range (0, 500f)]
+        public float thickness = 250f;
         public bool flattenSurface;
 
         [Header ("Material settings")]
@@ -27,6 +27,11 @@ namespace PathCreation.Examples {
                 AssignMeshComponents ();
                 AssignMaterials ();
                 CreateRoadMesh ();
+            }
+
+            if (GetComponent<AutoZigZagPathGenerator>())
+            {
+                GetComponent<AutoZigZagPathGenerator>().UpdateStartAndFinish();
             }
         }
 
@@ -127,6 +132,7 @@ namespace PathCreation.Examples {
             meshHolder.transform.rotation = Quaternion.identity;
             meshHolder.transform.position = Vector3.zero;
             meshHolder.transform.localScale = Vector3.one;
+            meshHolder.transform.parent = transform;
 
             // Ensure mesh renderer and filter components are assigned
             if (!meshHolder.gameObject.GetComponent<MeshFilter> ()) {
@@ -142,6 +148,12 @@ namespace PathCreation.Examples {
                 mesh = new Mesh ();
             }
             meshFilter.sharedMesh = mesh;
+
+            if(meshHolder.GetComponent<MeshCollider>() != null)
+            {
+                DestroyImmediate(meshHolder.GetComponent<MeshCollider>());
+            }
+            meshHolder.AddComponent<MeshCollider>();
         }
 
         void AssignMaterials () {
