@@ -4,23 +4,22 @@ using UnityEditor;
 using UnityEngine;
 
 [RequireComponent(typeof(PathCreator), typeof(RoadMeshCreator))]
-public class AutoPathGenerator : MonoBehaviour
+public class AutoPathGenerator : PathGeneratorBase
 {
     [Header("Path Creation Fields")]
-    [SerializeField] float pathLenght = 100f;
     [SerializeField] int amountOfPoints = 5;
     public float roadWidth = 3f;
     [SerializeField] float xRandomness;
     [SerializeField] float yRandomness;
 
-    [Header("Start and Finish Prefabs")]
-    [SerializeField] GameObject startPrefab;
-    [SerializeField] GameObject finishPrefab;
+
 
     private GameObject previousStartPrefab;
     private GameObject previousFinishPrefab;
 
-    public void GeneratePath()
+    public bool useStartAndFinish;
+
+    public override void GeneratePath()
     {
         var roadMeshCreator = GetComponent<RoadMeshCreator>();
 
@@ -32,7 +31,7 @@ public class AutoPathGenerator : MonoBehaviour
 
     private void InitializePath()
     {
-        var pathCreator = GetComponent<PathCreator>();
+        pathCreator = GetComponent<PathCreator>();
 
         BezierPath bezierPath = new BezierPath(GeneratePoints());
         pathCreator.bezierPath = bezierPath;
@@ -41,13 +40,23 @@ public class AutoPathGenerator : MonoBehaviour
         pathCreator.bezierPath.AutoControlLength = 0.01f;
 
         RemovePreviousStartAndFinish();
+        if (useStartAndFinish)
+        {
+            SpawnStart();
+            SpawnFinish();
+        }
+    }
 
+    public override void SpawnStart()
+    {
         previousStartPrefab = PrefabUtility.InstantiatePrefab(startPrefab, transform) as GameObject;
-        previousFinishPrefab = PrefabUtility.InstantiatePrefab(finishPrefab, transform) as GameObject;
-
         previousStartPrefab.transform.position = pathCreator.path.GetPointAtDistance(0, EndOfPathInstruction.Stop);
         previousStartPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(0, EndOfPathInstruction.Stop);
+    }
 
+    public override void SpawnFinish()
+    {
+        previousFinishPrefab = PrefabUtility.InstantiatePrefab(finishPrefab, transform) as GameObject;
         previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathLenght, EndOfPathInstruction.Stop);
         previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathLenght, EndOfPathInstruction.Stop);
     }
@@ -56,7 +65,7 @@ public class AutoPathGenerator : MonoBehaviour
     {
         var generatedPoints = new Vector3[amountOfPoints];
 
-        generatedPoints[0] = Vector3.zero;
+        generatedPoints[0] = transform.position;
 
         float distanceBetweenPoints = pathLenght / (amountOfPoints-1);
 

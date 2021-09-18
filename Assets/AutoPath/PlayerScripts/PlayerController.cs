@@ -32,8 +32,8 @@ public class PlayerController : MonoBehaviour
 
         var moveVector = new Vector3(hor, 0f, forwardSpeed) * Time.deltaTime;
 
-        distanceTraveled = pathCreator.path.GetClosestDistanceAlongPath(transform.position + transform.TransformVector(new Vector3(0f, 0f, forwardSpeed) * Time.deltaTime));
-
+        //distanceTraveled = pathCreator.path.GetClosestDistanceAlongPath(transform.position + transform.TransformVector(new Vector3(0f, 0f, forwardSpeed) * Time.deltaTime));
+        distanceTraveled += forwardSpeed * Time.deltaTime;
         RotateCharacter(pathCreator.path.GetRotationAtDistance(distanceTraveled, EndOfPathInstruction.Stop));
 
         RotateModel(moveVector);
@@ -56,13 +56,13 @@ public class PlayerController : MonoBehaviour
     private Vector3[] ClampPoints(Vector3 center)
     {
         var clampPoints = new Vector3[2];
-        clampPoints[0] = new Vector3(center.x + 3 * Mathf.Cos((360 - transform.eulerAngles.y) * Mathf.PI / 180),
+        clampPoints[0] = new Vector3(center.x + 3 * Mathf.Cos((360 - pathCreator.path.GetRotationAtDistance(distanceTraveled, EndOfPathInstruction.Stop).eulerAngles.y) * Mathf.PI / 180),
                                      0f,
-                                     center.z + 3 * Mathf.Sin((360 - transform.eulerAngles.y) * Mathf.PI / 180));
+                                     center.z + 3 * Mathf.Sin((360 - pathCreator.path.GetRotationAtDistance(distanceTraveled, EndOfPathInstruction.Stop).eulerAngles.y) * Mathf.PI / 180));
 
-        clampPoints[1] = new Vector3(center.x - 3 * Mathf.Cos((360 - transform.eulerAngles.y) * Mathf.PI / 180),
-                             0f,
-                             center.z - 3 * Mathf.Sin((360 - transform.eulerAngles.y) * Mathf.PI / 180));
+        clampPoints[1] = new Vector3(center.x - 3 * Mathf.Cos((360 - pathCreator.path.GetRotationAtDistance(distanceTraveled, EndOfPathInstruction.Stop).eulerAngles.y) * Mathf.PI / 180),
+                                     0f,
+                                     center.z - 3 * Mathf.Sin((360 - pathCreator.path.GetRotationAtDistance(distanceTraveled, EndOfPathInstruction.Stop).eulerAngles.y) * Mathf.PI / 180));
 
         return clampPoints;
     }
