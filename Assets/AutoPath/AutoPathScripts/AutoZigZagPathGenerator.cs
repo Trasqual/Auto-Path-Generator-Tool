@@ -17,6 +17,7 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
     [Header("Bevel Related Fields")]
     [SerializeField] int cornerBewelResolution = 10;
+    [SerializeField] float cornerBewelRadius = 1f;
 
 
     private GameObject previousStartPrefab;
@@ -76,7 +77,7 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
         for (int i = 1; i < generatedPoints.Length - 1; i++)
         {
-            for (int j = 0; j < cornerBewelResolution; j++)
+            for (int j = 0; j < cornerBewelResolution+1; j++)
             {
                 beweledPathPoints.Add(GenerateBewelPoints(generatedPoints[i - 1], generatedPoints[i], generatedPoints[i + 1])[j]);
             }
@@ -122,7 +123,7 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
     private Vector3[] GenerateBewelPoints(Vector3 prevCorner, Vector3 corner, Vector3 nextCorner)
     {
         var generatedBewelPoints = new Vector3[cornerBewelResolution+1];
-        var cornerBewelRadius = roadWidth * 2;
+        //cornerBewelRadius = roadWidth * 2;
 
         if (prevCorner.z > corner.z && nextCorner.x > corner.x)
         {

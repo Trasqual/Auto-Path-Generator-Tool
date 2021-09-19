@@ -12,7 +12,7 @@ public class PathFollower : MonoBehaviour
     {
         distance += 5 * Time.deltaTime;
         transform.position = pathCreator.path.GetPointAtDistance(distance, EndOfPathInstruction.Stop);
-        transform.rotation = Quaternion.Lerp(prevRot, pathCreator.path.GetRotationAtDistance(distance, EndOfPathInstruction.Stop), Time.deltaTime *5);
+        transform.rotation = Quaternion.Lerp(prevRot, pathCreator.path.GetRotationAtDistance(distance, EndOfPathInstruction.Stop), Time.deltaTime*5);
         prevRot = transform.rotation;
     }
 }
