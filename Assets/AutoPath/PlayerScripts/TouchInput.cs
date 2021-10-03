@@ -7,8 +7,6 @@ public class TouchInput : MonoBehaviour
     private float startTouch;
     private float swipeDelta;
 
-    private float velocityX = 0f;
-
     private void Update()
     {
 
@@ -26,7 +24,12 @@ public class TouchInput : MonoBehaviour
         {
             swipeDelta = 0f;
         }
-        horizontal = Mathf.SmoothDamp(horizontal, swipeDelta, ref velocityX, 0.3f);
+
+        var current = horizontal;
+
+        var target = (Mathf.Lerp(0, 1, Mathf.Abs(swipeDelta) / Screen.width)) * Mathf.Sign(swipeDelta);
+
+        horizontal = Vector2.MoveTowards(new Vector2(current, 0), new Vector2(target, 0), Time.deltaTime).x;
 #else
 
         if (Input.touchCount > 0)
@@ -46,7 +49,11 @@ public class TouchInput : MonoBehaviour
                 swipeDelta = 0f;
             }
         }
-        horizontal = Mathf.SmoothDamp(horizontal, swipeDelta, ref velocityX, 0.3f);
+        var current = horizontal;
+
+        var target = (Mathf.Lerp(0, 1, Mathf.Abs(swipeDelta) / Screen.width)) * Mathf.Sign(swipeDelta);
+
+        horizontal = Vector2.MoveTowards(new Vector2(current, 0), new Vector2(target, 0), Time.deltaTime).x;
 
 
 #endif
