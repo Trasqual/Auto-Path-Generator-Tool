@@ -1,3 +1,4 @@
+using PathCreation.Examples;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -15,6 +16,10 @@ public class MultiplePathGenerator : MonoBehaviour
 
     [SerializeField] GameObject startPreFab;
     [SerializeField] GameObject finishPreFab;
+
+    [SerializeField] Material roadMaterial;
+    [SerializeField] Material roadUnderSideMaterial;
+    [SerializeField] Material roadSideBevelMaterial;
 
     public void GenerateMultiPath()
     {
@@ -51,10 +56,10 @@ public class MultiplePathGenerator : MonoBehaviour
         pathGen.SpawnStart();
         arrangedPathPieces.Add(pathHolders[0]);
 
-        
+
         arrangedPathPieces.Add(SpawnedMiddlePart(pathGen.GetEndPoint(), pathGen.GetEndRotation()));
 
-        for (int i = 1; i < pathHolders.Count-1; i++)
+        for (int i = 1; i < pathHolders.Count - 1; i++)
         {
             pathHolders[i].transform.position = arrangedPathPieces[arrangedPathPieces.Count - 1].GetComponent<MiddlePartAnchors>().EndAnchor;
             pathHolders[i].transform.rotation = arrangedPathPieces[arrangedPathPieces.Count - 1].GetComponent<MiddlePartAnchors>().EndAnchorRotation;
@@ -68,7 +73,21 @@ public class MultiplePathGenerator : MonoBehaviour
         endPathGen.finishPrefab = finishPreFab;
         endPathGen.SpawnFinish();
         arrangedPathPieces.Add(pathHolders[pathHolders.Count - 1]);
-    } 
+
+        ApplyMaterials();
+    }
+
+    private void ApplyMaterials()
+    {
+        foreach (var path in pathHolders)
+        {
+            var meshCreator = path.GetComponent<RoadMeshCreator>();
+            meshCreator.roadMaterial = roadMaterial;
+            meshCreator.undersideMaterial = roadUnderSideMaterial;
+            meshCreator.bewelMaterial = roadSideBevelMaterial;
+            meshCreator.TriggerUpdate();
+        }
+    }
 
     private GameObject GetRandomMiddlePart()
     {
@@ -83,7 +102,7 @@ public class MultiplePathGenerator : MonoBehaviour
 
     private void ClearPath()
     {
-        if(arrangedPathPieces.Count > 0)
+        if (arrangedPathPieces.Count > 0)
         {
             foreach (var item in arrangedPathPieces)
             {

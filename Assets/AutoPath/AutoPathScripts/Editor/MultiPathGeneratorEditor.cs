@@ -1,8 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
+#if UNITY_EDITOR
+
 using UnityEngine;
 using UnityEditor;
-
 
 [CustomEditor(typeof(MultiplePathGenerator))]
 public class MultiPathGeneratorEditor : Editor
@@ -18,3 +17,5 @@ public class MultiPathGeneratorEditor : Editor
         }
     }
 }
+
+#endif

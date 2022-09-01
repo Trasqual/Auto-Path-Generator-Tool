@@ -1,18 +1,29 @@
 ﻿using System.Collections.Generic;
-using PathCreation.Utility;
+using System.Linq;
+using UnityEditor;
 using UnityEngine;
 
-namespace PathCreation.Examples {
-    public class RoadMeshCreator : PathSceneTool {
-        [Header ("Road settings")]
+namespace PathCreation.Examples
+{
+    public class RoadMeshCreator : PathSceneTool
+    {
+        [Header("Road settings")]
         public float roadWidth = 6f;
-        [Range (0, 500f)]
+        [Range(0, 500f)]
         public float thickness = 250f;
         public bool flattenSurface;
+        [Range(6, 18)]
+        public int bewelSegmentCount = 6;
+        [Range(0.25f, 3f)]
+        public float bewelRadius = 0.5f;
 
-        [Header ("Material settings")]
+        [Range(-0.45f, 0)]
+        public float bewelHeight = 0f;
+
+        [Header("Material settings")]
         public Material roadMaterial;
         public Material undersideMaterial;
+        public Material bewelMaterial;
         public float textureTiling = 1;
 
         [SerializeField, HideInInspector]
@@ -22,28 +33,42 @@ namespace PathCreation.Examples {
         MeshRenderer meshRenderer;
         Mesh mesh;
 
-        protected override void PathUpdated () {
-            if (pathCreator != null) {
-                AssignMeshComponents ();
-                AssignMaterials ();
-                CreateRoadMesh ();
+        public override void PathUpdated()
+        {
+            pathCreator = GetComponent<PathCreator>();
+            if (pathCreator != null)
+            {
+                AssignMeshComponents();
+                AssignMaterials();
+                CreateRoadMesh();
             }
 
             if (GetComponent<AutoZigZagPathGenerator>())
             {
                 GetComponent<AutoZigZagPathGenerator>().UpdateStartAndFinish();
             }
+
+            else if (GetComponent<AutoPathGenerator>())
+            {
+                GetComponent<AutoPathGenerator>().UpdateStartAndFinish();
+            }
+
+            AssetDatabase.Refresh();
         }
 
-        void CreateRoadMesh () {
+        void CreateRoadMesh()
+        {
+            List<Vector3> vertList = new List<Vector3>();
             Vector3[] verts = new Vector3[path.NumPoints * 8];
-            Vector2[] uvs = new Vector2[verts.Length];
-            Vector3[] normals = new Vector3[verts.Length];
+            Vector2[] uvs = new Vector2[verts.Length + 2 * (bewelSegmentCount + 1) * path.NumPoints];
+            Vector3[] normals = new Vector3[verts.Length + 2 * (bewelSegmentCount + 1) * path.NumPoints];
 
             int numTris = 2 * (path.NumPoints - 1) + ((path.isClosedLoop) ? 2 : 0);
             int[] roadTriangles = new int[numTris * 3];
             int[] underRoadTriangles = new int[numTris * 3];
             int[] sideOfRoadTriangles = new int[numTris * 2 * 3];
+            List<int> rightSideTriangles = new List<int>();
+            List<int> leftSideTriangles = new List<int>();
 
             int vertIndex = 0;
             int triIndex = 0;
@@ -57,13 +82,16 @@ namespace PathCreation.Examples {
 
             bool usePathNormals = !(path.space == PathSpace.xyz && flattenSurface);
 
-            for (int i = 0; i < path.NumPoints; i++) {
-                Vector3 localUp = (usePathNormals) ? Vector3.Cross (path.GetTangent (i), path.GetNormal (i)) : path.up;
-                Vector3 localRight = (usePathNormals) ? path.GetNormal (i) : Vector3.Cross (localUp, path.GetTangent (i));
+            List<Vector3> rightBewelVerts = new List<Vector3>();
+            List<Vector3> leftBewelVerts = new List<Vector3>();
+            for (int i = 0; i < path.NumPoints; i++)
+            {
+                Vector3 localUp = (usePathNormals) ? Vector3.Cross(path.GetTangent(i), path.GetNormal(i)) : path.up;
+                Vector3 localRight = (usePathNormals) ? path.GetNormal(i) : Vector3.Cross(localUp, path.GetTangent(i));
 
                 // Find position to left and right of current path vertex
-                Vector3 vertSideA = path.GetPoint (i) - localRight * Mathf.Abs (roadWidth);
-                Vector3 vertSideB = path.GetPoint (i) + localRight * Mathf.Abs (roadWidth);
+                Vector3 vertSideA = path.GetPoint(i) - localRight * Mathf.Abs(roadWidth);
+                Vector3 vertSideB = path.GetPoint(i) + localRight * Mathf.Abs(roadWidth);
 
                 // Add top of road vertices
                 verts[vertIndex + 0] = vertSideA;
@@ -73,14 +101,14 @@ namespace PathCreation.Examples {
                 verts[vertIndex + 3] = vertSideB - localUp * thickness;
 
                 // Duplicate vertices to get flat shading for sides of road
-                verts[vertIndex + 4] = verts[vertIndex + 0];
-                verts[vertIndex + 5] = verts[vertIndex + 1];
-                verts[vertIndex + 6] = verts[vertIndex + 2];
-                verts[vertIndex + 7] = verts[vertIndex + 3];
+                verts[vertIndex + 4] = verts[vertIndex + 0] - localRight * (bewelRadius * 2F - Mathf.Abs(bewelHeight)) + localUp * bewelHeight;
+                verts[vertIndex + 5] = verts[vertIndex + 1] + localRight * (bewelRadius * 2F - Mathf.Abs(bewelHeight)) + localUp * bewelHeight;
+                verts[vertIndex + 6] = verts[vertIndex + 2] - localRight * (bewelRadius * 2F - Mathf.Abs(bewelHeight)) - localUp * thickness;
+                verts[vertIndex + 7] = verts[vertIndex + 3] + localRight * (bewelRadius * 2F - Mathf.Abs(bewelHeight)) - localUp * thickness;
 
                 // Set uv on y axis to path time (0 at start of path, up to 1 at end of path)
-                uvs[vertIndex + 0] = new Vector2 (0, path.times[i]);
-                uvs[vertIndex + 1] = new Vector2 (1, path.times[i]);
+                uvs[vertIndex + 0] = new Vector2(0, path.times[i]);
+                uvs[vertIndex + 1] = new Vector2(1, path.times[i]);
 
                 // Top of road normals
                 normals[vertIndex + 0] = localUp;
@@ -95,38 +123,169 @@ namespace PathCreation.Examples {
                 normals[vertIndex + 7] = localRight;
 
                 // Set triangle indices
-                if (i < path.NumPoints - 1 || path.isClosedLoop) {
-                    for (int j = 0; j < triangleMap.Length; j++) {
+                if (i < path.NumPoints - 1 || path.isClosedLoop)
+                {
+                    for (int j = 0; j < triangleMap.Length; j++)
+                    {
                         roadTriangles[triIndex + j] = (vertIndex + triangleMap[j]) % verts.Length;
                         // reverse triangle map for under road so that triangles wind the other way and are visible from underneath
                         underRoadTriangles[triIndex + j] = (vertIndex + triangleMap[triangleMap.Length - 1 - j] + 2) % verts.Length;
                     }
-                    for (int j = 0; j < sidesTriangleMap.Length; j++) {
+                    for (int j = 0; j < sidesTriangleMap.Length; j++)
+                    {
                         sideOfRoadTriangles[triIndex * 2 + j] = (vertIndex + sidesTriangleMap[j]) % verts.Length;
                     }
-
                 }
 
                 vertIndex += 8;
                 triIndex += 6;
             }
 
-            mesh.Clear ();
-            mesh.vertices = verts;
+            //rightBewelVerts
+            for (int i = 0; i < path.NumPoints; i++)
+            {
+                Vector3 localUp = (usePathNormals) ? Vector3.Cross(path.GetTangent(i), path.GetNormal(i)) : path.up;
+                Vector3 localRight = (usePathNormals) ? path.GetNormal(i) : Vector3.Cross(localUp, path.GetTangent(i));
+
+                Vector3 vertSideB = path.GetPoint(i) + localRight * Mathf.Abs(roadWidth);
+                Vector3 rightPoint = vertSideB + localRight * (bewelRadius * 2f - Mathf.Abs(bewelHeight)) + localUp * bewelHeight;
+                var center = vertSideB + localRight * (bewelRadius - Mathf.Abs(bewelHeight)) + localUp * bewelHeight; ;
+                rightBewelVerts.AddRange(GetRightBewelPoints(center, bewelRadius, bewelSegmentCount, localRight, localUp, vertSideB, rightPoint).ToList());
+            }
+
+            //leftBewelVerts
+            for (int i = 0; i < path.NumPoints; i++)
+            {
+                Vector3 localUp = (usePathNormals) ? Vector3.Cross(path.GetTangent(i), path.GetNormal(i)) : path.up;
+                Vector3 localRight = (usePathNormals) ? path.GetNormal(i) : Vector3.Cross(localUp, path.GetTangent(i));
+
+                // Find position to left and right of current path vertex
+                Vector3 vertSideA = path.GetPoint(i) - localRight * Mathf.Abs(roadWidth);
+                Vector3 leftPoint = vertSideA - localRight * (bewelRadius * 2f - Mathf.Abs(bewelHeight)) + localUp * bewelHeight;
+                var center = vertSideA - localRight * (bewelRadius - Mathf.Abs(bewelHeight)) + localUp * bewelHeight; ;
+                leftBewelVerts.AddRange(GetLeftBewelPoints(center, bewelRadius, bewelSegmentCount, localRight, localUp, leftPoint, vertSideA).ToList());
+            }
+
+            //rightTris
+            for (int i = 0; i < path.NumPoints - 1; i++)
+            {
+                int rootIndex = (i * (bewelSegmentCount + 1)) + verts.Length;
+                int rootIndexNext = ((i + 1) * (bewelSegmentCount + 1)) + verts.Length;
+                for (int j = 0; j < bewelSegmentCount; j++)
+                {
+                    int first = rootIndex + j;
+                    int second = rootIndexNext + j;
+                    int third = rootIndexNext + j + 1;
+                    int fourth = rootIndex + j;
+                    int fifth = rootIndexNext + j + 1;
+                    int sixth = rootIndex + j + 1;
+                    rightSideTriangles.Add(sixth);
+                    rightSideTriangles.Add(fifth);
+                    rightSideTriangles.Add(fourth);
+                    rightSideTriangles.Add(third);
+                    rightSideTriangles.Add(second);
+                    rightSideTriangles.Add(first);
+                }
+            }
+
+            //leftTris
+            for (int i = 0; i < path.NumPoints - 1; i++)
+            {
+                int rootIndex = (i * (bewelSegmentCount + 1)) + verts.Length + rightBewelVerts.Count;
+                int rootIndexNext = ((i + 1) * (bewelSegmentCount + 1)) + verts.Length + rightBewelVerts.Count;
+                for (int j = 0; j < bewelSegmentCount; j++)
+                {
+                    int first = rootIndex + j;
+                    int second = rootIndexNext + j;
+                    int third = rootIndexNext + j + 1;
+                    int fourth = rootIndex + j;
+                    int fifth = rootIndexNext + j + 1;
+                    int sixth = rootIndex + j + 1;
+                    leftSideTriangles.Add(sixth);
+                    leftSideTriangles.Add(fifth);
+                    leftSideTriangles.Add(fourth);
+                    leftSideTriangles.Add(third);
+                    leftSideTriangles.Add(second);
+                    leftSideTriangles.Add(first);
+                }
+            }
+
+            //rightUVs
+            for (int i = 0; i < path.NumPoints; i++)
+            {
+                for (int j = 0; j < bewelSegmentCount + 1; j++)
+                {
+                    uvs[verts.Length + j + ((bewelSegmentCount + 1) * i)] = new Vector2((float)j / bewelSegmentCount, path.times[i]);
+                }
+            }
+            //leftUVs
+            for (int i = 0; i < path.NumPoints; i++)
+            {
+                for (int j = 0; j < bewelSegmentCount + 1; j++)
+                {
+                    uvs[verts.Length + rightBewelVerts.Count + j + ((bewelSegmentCount + 1) * i)] = new Vector2((float)j / bewelSegmentCount, path.times[i]);
+                }
+            }
+
+
+            vertList.AddRange(verts.ToList());
+            vertList.AddRange(rightBewelVerts);
+            vertList.AddRange(leftBewelVerts);
+
+            mesh.Clear();
+            mesh.vertices = vertList.ToArray();
             mesh.uv = uvs;
             mesh.normals = normals;
-            mesh.subMeshCount = 3;
-            mesh.SetTriangles (roadTriangles, 0);
-            mesh.SetTriangles (underRoadTriangles, 1);
-            mesh.SetTriangles (sideOfRoadTriangles, 2);
-            mesh.RecalculateBounds ();
+            mesh.subMeshCount = 5;
+            mesh.SetTriangles(roadTriangles, 0);
+            mesh.SetTriangles(underRoadTriangles, 1);
+            mesh.SetTriangles(sideOfRoadTriangles, 2);
+            mesh.SetTriangles(rightSideTriangles, 3);
+            mesh.SetTriangles(leftSideTriangles, 4);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
         }
 
-        // Add MeshRenderer and MeshFilter components to this gameobject if not already attached
-        void AssignMeshComponents () {
+        Vector3[] GetRightBewelPoints(Vector3 center, float radius, int segmentCount, Vector3 localRight, Vector3 localUp, Vector3 leftPoint, Vector3 rightPoint)
+        {
+            Vector3[] bewelPoints = new Vector3[segmentCount + 1];
+            for (int i = 0; i < bewelPoints.Length; i++)
+            {
+                var angle = Vector3.Angle((leftPoint - center).normalized, (rightPoint - center).normalized);
+                var curAngle = Mathf.Deg2Rad * (((angle / segmentCount) * i));
+                bewelPoints[i] = center + localRight * (radius * Mathf.Cos(curAngle)) + localUp * (radius * Mathf.Sin(curAngle));
+            }
+            return bewelPoints;
+        }
 
-            if (meshHolder == null) {
-                meshHolder = new GameObject ("Road Mesh Holder");
+        Vector3[] GetLeftBewelPoints(Vector3 center, float radius, int segmentCount, Vector3 localRight, Vector3 localUp, Vector3 leftPoint, Vector3 rightPoint)
+        {
+            Vector3[] bewelPoints = new Vector3[segmentCount + 1];
+            for (int i = 0; i < bewelPoints.Length; i++)
+            {
+                var angle = Vector3.Angle((leftPoint - center).normalized, (rightPoint - center).normalized);
+                var curAngle = Mathf.Deg2Rad * (180 - (angle - ((angle / segmentCount) * i)));
+                bewelPoints[i] = center + localRight * (radius * Mathf.Cos(curAngle)) + localUp * (radius * Mathf.Sin(curAngle));
+            }
+            return bewelPoints;
+        }
+
+        //private void OnDrawGizmos()
+        //{
+        //    foreach(var vert in mesh.vertices)
+        //    {
+        //        Gizmos.DrawSphere(vert, 0.05f);
+        //    }
+
+        //}
+
+        // Add MeshRenderer and MeshFilter components to this gameobject if not already attached
+        void AssignMeshComponents()
+        {
+
+            if (meshHolder == null)
+            {
+                meshHolder = new GameObject("Road Mesh Holder");
             }
 
             meshHolder.transform.rotation = Quaternion.identity;
@@ -135,33 +294,42 @@ namespace PathCreation.Examples {
             meshHolder.transform.parent = transform;
 
             // Ensure mesh renderer and filter components are assigned
-            if (!meshHolder.gameObject.GetComponent<MeshFilter> ()) {
-                meshHolder.gameObject.AddComponent<MeshFilter> ();
+            if (!meshHolder.gameObject.GetComponent<MeshFilter>())
+            {
+                meshHolder.gameObject.AddComponent<MeshFilter>();
             }
-            if (!meshHolder.GetComponent<MeshRenderer> ()) {
-                meshHolder.gameObject.AddComponent<MeshRenderer> ();
+            if (!meshHolder.GetComponent<MeshRenderer>())
+            {
+                meshHolder.gameObject.AddComponent<MeshRenderer>();
             }
 
-            meshRenderer = meshHolder.GetComponent<MeshRenderer> ();
-            meshFilter = meshHolder.GetComponent<MeshFilter> ();
-            if (mesh == null) {
-                mesh = new Mesh ();
+            meshRenderer = meshHolder.GetComponent<MeshRenderer>();
+            meshFilter = meshHolder.GetComponent<MeshFilter>();
+            if (mesh == null)
+            {
+                mesh = new Mesh();
             }
             meshFilter.sharedMesh = mesh;
 
-            if(meshHolder.GetComponent<MeshCollider>() != null)
+            if (meshHolder.gameObject.GetComponent<MeshCollider>())
             {
-                DestroyImmediate(meshHolder.GetComponent<MeshCollider>());
+#if UNITY_EDITOR
+                DestroyImmediate(meshHolder.GetComponent<MeshCollider>(), true);
+#else
+                    Destroy(meshHolder.GetComponent<MeshCollider>());
+#endif
             }
+
             meshHolder.AddComponent<MeshCollider>();
         }
 
-        void AssignMaterials () {
-            if (roadMaterial != null && undersideMaterial != null) {
-                meshRenderer.sharedMaterials = new Material[] { roadMaterial, undersideMaterial, undersideMaterial };
-                meshRenderer.sharedMaterials[0].mainTextureScale = new Vector3 (1, textureTiling);
+        void AssignMaterials()
+        {
+            if (roadMaterial != null && undersideMaterial != null)
+            {
+                meshRenderer.sharedMaterials = new Material[]
+                    { roadMaterial, undersideMaterial, undersideMaterial, bewelMaterial, bewelMaterial };
             }
         }
-
     }
 }

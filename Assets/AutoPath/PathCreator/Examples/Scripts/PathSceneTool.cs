@@ -26,6 +26,6 @@ namespace PathCreation.Examples
             }
         }
 
-        protected abstract void PathUpdated();
+        public abstract void PathUpdated();
     }
 }

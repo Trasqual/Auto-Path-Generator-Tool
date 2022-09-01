@@ -12,8 +12,6 @@ public class AutoPathGenerator : PathGeneratorBase
     [SerializeField] float xRandomness;
     [SerializeField] float yRandomness;
 
-
-
     private GameObject previousStartPrefab;
     private GameObject previousFinishPrefab;
 
@@ -24,7 +22,7 @@ public class AutoPathGenerator : PathGeneratorBase
         var roadMeshCreator = GetComponent<RoadMeshCreator>();
 
         InitializePath();
-        roadMeshCreator.textureTiling = pathLenght;
+
         roadMeshCreator.flattenSurface = true;
         roadMeshCreator.roadWidth = roadWidth;
     }
@@ -37,37 +35,48 @@ public class AutoPathGenerator : PathGeneratorBase
         pathCreator.bezierPath = bezierPath;
 
         pathCreator.bezierPath.GlobalNormalsAngle = 90f;
-        pathCreator.bezierPath.AutoControlLength = 0.01f;
+        pathCreator.bezierPath.AutoControlLength = 0.3f;
 
         RemovePreviousStartAndFinish();
+
         if (useStartAndFinish)
         {
             SpawnStart();
             SpawnFinish();
+
+            AdjustRotations();
         }
     }
 
     public override void SpawnStart()
     {
+#if UNITY_EDITOR
+
         previousStartPrefab = PrefabUtility.InstantiatePrefab(startPrefab, transform) as GameObject;
         previousStartPrefab.transform.position = pathCreator.path.GetPointAtDistance(0, EndOfPathInstruction.Stop);
         previousStartPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(0, EndOfPathInstruction.Stop);
+
+#endif
     }
 
     public override void SpawnFinish()
     {
+#if UNITY_EDITOR
+
         previousFinishPrefab = PrefabUtility.InstantiatePrefab(finishPrefab, transform) as GameObject;
-        previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathLenght, EndOfPathInstruction.Stop);
-        previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathLenght, EndOfPathInstruction.Stop);
+        previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+        previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+
+#endif
     }
 
     private Vector3[] GeneratePoints()
     {
         var generatedPoints = new Vector3[amountOfPoints];
 
-        generatedPoints[0] = transform.position;
+        generatedPoints[0] = Vector3.zero;
 
-        float distanceBetweenPoints = pathLenght / (amountOfPoints-1);
+        float distanceBetweenPoints = pathLenght / (amountOfPoints - 1);
 
         for (int i = 1; i < generatedPoints.Length; i++)
         {
@@ -84,21 +93,51 @@ public class AutoPathGenerator : PathGeneratorBase
     {
         var pathCreator = GetComponent<PathCreator>();
 
+        SetStartAndFinishPrefabs();
+
         if (previousStartPrefab != null && previousFinishPrefab != null)
         {
             previousStartPrefab.transform.position = pathCreator.path.GetPointAtDistance(0, EndOfPathInstruction.Stop);
             previousStartPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(0, EndOfPathInstruction.Stop);
-            previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathLenght, EndOfPathInstruction.Stop);
-            previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathLenght, EndOfPathInstruction.Stop);
+            previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+            previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+
+            AdjustRotations();
         }
+    }
+
+    private void AdjustRotations()
+    {
+        var finishPrefabRotation = previousFinishPrefab.transform.eulerAngles;
+        previousFinishPrefab.transform.eulerAngles = new Vector3(finishPrefabRotation.x, finishPrefabRotation.y, 0);
+
+        var startPrefabRotation = previousStartPrefab.transform.eulerAngles;
+        previousStartPrefab.transform.eulerAngles = new Vector3(startPrefabRotation.x, startPrefabRotation.y, 0);
     }
 
     public void RemovePreviousStartAndFinish()
     {
+        SetStartAndFinishPrefabs();
+
         if (previousStartPrefab != null && previousFinishPrefab != null)
         {
-            DestroyImmediate(previousStartPrefab);
-            DestroyImmediate(previousFinishPrefab);
+            DestroyImmediate(previousStartPrefab, true);
+            DestroyImmediate(previousFinishPrefab, true);
+        }
+    }
+
+    private void SetStartAndFinishPrefabs()
+    {
+        foreach (Transform child in transform)
+        {
+            if (child.name == "StartPrefab")
+            {
+                previousStartPrefab = child.gameObject;
+            }
+            if (child.name == "FinishPrefab")
+            {
+                previousFinishPrefab = child.gameObject;
+            }
         }
     }
 }

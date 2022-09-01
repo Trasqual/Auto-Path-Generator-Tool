@@ -1,8 +1,8 @@
 using PathCreation;
 using PathCreation.Examples;
 using UnityEngine;
-using UnityEditor;
 using System.Collections.Generic;
+using UnityEditor;
 
 [RequireComponent(typeof(PathCreator), typeof(RoadMeshCreator))]
 public class AutoZigZagPathGenerator : PathGeneratorBase
@@ -10,6 +10,7 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
     [Header("Path Creation Fields")]
     [SerializeField] int amountOfPoints = 5;
     public float roadWidth = 3f;
+    [SerializeField] float cornerAngle = 90f;
 
     [Header("UpAndDownRandomness")]
     [SerializeField] bool useY;
@@ -17,22 +18,21 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
     [Header("Bevel Related Fields")]
     [SerializeField] int cornerBewelResolution = 10;
-    [SerializeField] float cornerBewelRadius = 1f;
-
+    [SerializeField] float cornerBewelRadius = 5f;
 
     private GameObject previousStartPrefab;
     private GameObject previousFinishPrefab;
 
-    private List<Vector3> beweledPathPoints = new List<Vector3>();
-
     public bool useStartAndFinish;
+
+    private List<Vector3> beweledPathPoints = new List<Vector3>();
 
     public override void GeneratePath()
     {
         var roadMeshCreator = GetComponent<RoadMeshCreator>();
 
         InitializePath();
-        roadMeshCreator.textureTiling = pathLenght;
+
         roadMeshCreator.flattenSurface = true;
         roadMeshCreator.roadWidth = roadWidth;
     }
@@ -46,6 +46,7 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
         pathCreator.bezierPath.GlobalNormalsAngle = 90f;
         pathCreator.bezierPath.AutoControlLength = 0.01f;
+        pathCreator.EditorData.vertexPathMaxAngleError = 45f;
 
         RemovePreviousStartAndFinish();
 
@@ -53,21 +54,31 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
         {
             SpawnStart();
             SpawnFinish();
+
+            AdjustRotations();
         }
     }
 
     public override void SpawnStart()
     {
+#if UNITY_EDITOR
+
         previousStartPrefab = PrefabUtility.InstantiatePrefab(startPrefab, transform) as GameObject;
         previousStartPrefab.transform.position = pathCreator.path.GetPointAtDistance(0, EndOfPathInstruction.Stop);
         previousStartPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(0, EndOfPathInstruction.Stop);
+
+#endif
     }
 
     public override void SpawnFinish()
     {
+#if UNITY_EDITOR
+
         previousFinishPrefab = PrefabUtility.InstantiatePrefab(finishPrefab, transform) as GameObject;
-        previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathLenght, EndOfPathInstruction.Stop);
-        previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathLenght, EndOfPathInstruction.Stop);
+        previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+        previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+
+#endif
     }
 
     private List<Vector3> PathPointsWithBewel(Vector3[] generatedPoints)
@@ -77,7 +88,7 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
         for (int i = 1; i < generatedPoints.Length - 1; i++)
         {
-            for (int j = 0; j < cornerBewelResolution+1; j++)
+            for (int j = 0; j < cornerBewelResolution; j++)
             {
                 beweledPathPoints.Add(GenerateBewelPoints(generatedPoints[i - 1], generatedPoints[i], generatedPoints[i + 1])[j]);
             }
@@ -91,9 +102,7 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
     {
         var generatedPoints = new Vector3[amountOfPoints];
 
-        generatedPoints[0] = transform.position;
-
-
+        generatedPoints[0] = Vector3.zero;
 
         float distanceBetweenPoints = pathLenght / (amountOfPoints - 1);
 
@@ -119,11 +128,10 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
         return generatedPoints;
     }
 
-
     private Vector3[] GenerateBewelPoints(Vector3 prevCorner, Vector3 corner, Vector3 nextCorner)
     {
-        var generatedBewelPoints = new Vector3[cornerBewelResolution+1];
-        //cornerBewelRadius = roadWidth * 2;
+        var generatedBewelPoints = new Vector3[cornerBewelResolution + 1];
+        //var cornerBewelRadius = roadWidth * 2;
 
         if (prevCorner.z > corner.z && nextCorner.x > corner.x)
         {
@@ -133,9 +141,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -147,9 +155,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -161,9 +169,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -175,9 +183,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -189,9 +197,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -203,9 +211,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -217,9 +225,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle - (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -231,9 +239,9 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
 
             for (int i = 0; i < cornerBewelResolution + 1; i++)
             {
-                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180),
+                generatedBewelPoints[i] = new Vector3(center.x + cornerBewelRadius * Mathf.Cos((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180),
                                                       center.y,
-                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (90 / cornerBewelResolution))) * Mathf.PI / 180));
+                                                      center.z + cornerBewelRadius * Mathf.Sin((angle + (i * (cornerAngle / cornerBewelResolution))) * Mathf.PI / 180));
 
             }
         }
@@ -245,21 +253,51 @@ public class AutoZigZagPathGenerator : PathGeneratorBase
     {
         var pathCreator = GetComponent<PathCreator>();
 
+        SetStartAndFinishPrefabs();
+
         if (previousStartPrefab != null && previousFinishPrefab != null)
         {
             previousStartPrefab.transform.position = pathCreator.path.GetPointAtDistance(0, EndOfPathInstruction.Stop);
             previousStartPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(0, EndOfPathInstruction.Stop);
-            previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathLenght, EndOfPathInstruction.Stop);
-            previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathLenght, EndOfPathInstruction.Stop);
+            previousFinishPrefab.transform.position = pathCreator.path.GetPointAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+            previousFinishPrefab.transform.rotation = pathCreator.path.GetRotationAtDistance(pathCreator.path.length, EndOfPathInstruction.Stop);
+
+            AdjustRotations();
         }
+    }
+
+    private void AdjustRotations()
+    {
+        var finishPrefabRotation = previousFinishPrefab.transform.eulerAngles;
+        previousFinishPrefab.transform.eulerAngles = new Vector3(finishPrefabRotation.x, finishPrefabRotation.y, 0);
+
+        var startPrefabRotation = previousStartPrefab.transform.eulerAngles;
+        previousStartPrefab.transform.eulerAngles = new Vector3(startPrefabRotation.x, startPrefabRotation.y, 0);
     }
 
     public void RemovePreviousStartAndFinish()
     {
+        SetStartAndFinishPrefabs();
+
         if (previousStartPrefab != null && previousFinishPrefab != null)
         {
-            DestroyImmediate(previousStartPrefab);
-            DestroyImmediate(previousFinishPrefab);
+            DestroyImmediate(previousStartPrefab, true);
+            DestroyImmediate(previousFinishPrefab, true);
+        }
+    }
+
+    private void SetStartAndFinishPrefabs()
+    {
+        foreach (Transform child in transform)
+        {
+            if (child.name == "StartPrefab")
+            {
+                previousStartPrefab = child.gameObject;
+            }
+            if (child.name == "FinishPrefab")
+            {
+                previousFinishPrefab = child.gameObject;
+            }
         }
     }
 }
