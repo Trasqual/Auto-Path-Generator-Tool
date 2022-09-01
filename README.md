@@ -5,7 +5,7 @@ Auto Path Generator is an extension tool for Sebastian Lague's Path Creator ( ht
 
 Auto Path Generator allows you to create spline paths, zig zag shaped paths and multi paths (which is a combination for spline or zig zag paths with middle segments in between).
 
-### ShowCase:
+### Feature ShowCase:
 
 * Adjustable Beveled Edges for the side of the road
 
